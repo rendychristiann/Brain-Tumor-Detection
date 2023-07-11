@@ -1,0 +1,371 @@
+classdef GUI_Kelompok_7_m < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure                  matlab.ui.Figure
+        TabGroup                  matlab.ui.container.TabGroup
+        InputImageTab             matlab.ui.container.Tab
+        Panel_8                   matlab.ui.container.Panel
+        InputYourMRIImagebmpformatbypressingtheRunbuttonbelowLabel  matlab.ui.control.Label
+        Label_3                   matlab.ui.control.Label
+        RunButton                 matlab.ui.control.Button
+        ImageFilteringforBrainTumorDetectionusingMRIImageLabel  matlab.ui.control.Label
+        Panel_3                   matlab.ui.container.Panel
+        ImportedMRIImageLabel     matlab.ui.control.Label
+        UIAxes                    matlab.ui.control.UIAxes
+        Panel                     matlab.ui.container.Panel
+        Panel_2                   matlab.ui.container.Panel
+        Label_2                   matlab.ui.control.Label
+        Label                     matlab.ui.control.Label
+        TumorDetectionTab         matlab.ui.container.Tab
+        TabGroup2                 matlab.ui.container.TabGroup
+        MRlOriginalImageTab       matlab.ui.container.Tab
+        Panel_4                   matlab.ui.container.Panel
+        UIAxes2                   matlab.ui.control.UIAxes
+        MRIOriginalImageLabel     matlab.ui.control.Label
+        ImageFilteringTab         matlab.ui.container.Tab
+        TabGroup3                 matlab.ui.container.TabGroup
+        BWImageTab                matlab.ui.container.Tab
+        UIAxes3                   matlab.ui.control.UIAxes
+        MedianFilterTab           matlab.ui.container.Tab
+        UIAxes4                   matlab.ui.control.UIAxes
+        WienerFilterTab           matlab.ui.container.Tab
+        UIAxes5                   matlab.ui.control.UIAxes
+        BinarizeTab               matlab.ui.container.Tab
+        UIAxes6                   matlab.ui.control.UIAxes
+        PredefinedSobelFilterTab  matlab.ui.container.Tab
+        UIAxes7                   matlab.ui.control.UIAxes
+        FilteredMRIImageLabel     matlab.ui.control.Label
+        TumorDetectionTab_2       matlab.ui.container.Tab
+        Panel_6                   matlab.ui.container.Panel
+        UIAxes8                   matlab.ui.control.UIAxes
+        TumorClassificationLabel  matlab.ui.control.Label
+    end
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Button pushed function: RunButton
+        function RunButtonPushed(app, event)
+            
+            %% Get MRI image from local storage
+            [path, nofile] = imgetfile();
+            if nofile
+                msgbox(sprintf('Image Not Found'), 'Error', 'Warning');
+                return
+            end
+            
+            MRI_image = imread(path);
+            imshow(MRI_image, 'Parent', app.UIAxes);
+            imshow(MRI_image, 'Parent', app.UIAxes2);
+            
+                
+            %% Image Filtering 
+            MRI_image       = imresize(MRI_image,[224,224]);
+            image_BW        = im2gray(MRI_image); % Gray Scaling
+            imshow(image_BW, 'Parent', app.UIAxes3);
+            medfilt_img     = medfilt2(image_BW); % Median Filter
+            imshow(medfilt_img, 'Parent', app.UIAxes4);
+            wiener_img      = wiener2(medfilt_img,[5 5]); % Wiener Filter
+            imshow(medfilt_img, 'Parent', app.UIAxes5);
+            binarize_img    = im2bw(wiener_img,.6);
+            imshow(binarize_img, 'Parent', app.UIAxes6);
+            
+                
+            %% Predefined Sobel horizontal edge-emphasizing Filter
+            hy = -fspecial('sobel');
+            hx = hy';
+            Iy = imfilter(double(binarize_img), hy, 'replicate');
+            Ix = imfilter(double(binarize_img), hx, 'replicate');
+            
+            gradmag = sqrt(Ix.^2 + Iy.^2);
+            L = watershed(gradmag);
+            Lrgb = label2rgb(L);
+            
+            imshow(Lrgb, 'Parent', app.UIAxes7);
+                
+            %% Image morphological structuring 
+            se = strel('disk', 20);  % se - Structuring Element
+            Io = imopen(binarize_img, se);                 % opening (erosi+dilasi) objek
+            Ie = imerode(binarize_img , se);                % erosi/pengecilan ukuran objek
+            
+            Iobr = imreconstruct(Ie, binarize_img );        % rekonstruksi morfologis gambar
+            Iobrd = imdilate(Iobr, se);                 % dilasi/perbesaran gambar
+            Iobrcbr = imreconstruct(imcomplement(Iobrd), imcomplement(Iobr));
+            Iobrcbr = imcomplement(Iobrcbr);            % complement nilai pixel objek
+            
+            I2 = binarize_img ;
+            fgm = imregionalmax(Iobrcbr);               % peroleh titik-titik maksimum lokal objek 
+            I2(fgm) = 255;                              % set nilai maksimum pixel = 255
+            
+            se2 = strel(ones(5,5));
+            fgm2 = imclose(fgm, se2);
+            fgm3 = imerode(fgm2, se2);
+            fgm4 = bwareaopen(fgm3, 20);
+            
+            I3 = imerode(binarize_img , se);
+            bw = im2bw(Iobrcbr);
+            imshow(bw, 'Parent', app.UIAxes8);
+            %% -----------------------------------------------------------------
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure and hide until all components are created
+            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.Position = [100 100 640 480];
+            app.UIFigure.Name = 'MATLAB App';
+
+            % Create TabGroup
+            app.TabGroup = uitabgroup(app.UIFigure);
+            app.TabGroup.Position = [0 1 641 481];
+
+            % Create InputImageTab
+            app.InputImageTab = uitab(app.TabGroup);
+            app.InputImageTab.Title = 'Input Image';
+            app.InputImageTab.BackgroundColor = [0.6353 0.0784 0.1843];
+
+            % Create Label
+            app.Label = uilabel(app.InputImageTab);
+            app.Label.FontName = 'Roboto';
+            app.Label.FontSize = 20;
+            app.Label.FontWeight = 'bold';
+            app.Label.Position = [182 104 25 27];
+            app.Label.Text = '';
+
+            % Create Panel
+            app.Panel = uipanel(app.InputImageTab);
+            app.Panel.BackgroundColor = [1 1 1];
+            app.Panel.Position = [21 28 161 374];
+
+            % Create Panel_2
+            app.Panel_2 = uipanel(app.Panel);
+            app.Panel_2.BackgroundColor = [0.851 0.3255 0.098];
+            app.Panel_2.Position = [0 258 160 115];
+
+            % Create Label_2
+            app.Label_2 = uilabel(app.Panel_2);
+            app.Label_2.HorizontalAlignment = 'center';
+            app.Label_2.FontName = 'Roboto';
+            app.Label_2.FontWeight = 'bold';
+            app.Label_2.FontColor = [1 1 1];
+            app.Label_2.Position = [14 14 134 88];
+            app.Label_2.Text = {'Final Project of '; '"Signal Processing and'; 'Multimedia Services"'; ''; 'Topic: Image Filtering'; ''; ''};
+
+            % Create Panel_3
+            app.Panel_3 = uipanel(app.InputImageTab);
+            app.Panel_3.ForegroundColor = [0.149 0.149 0.149];
+            app.Panel_3.BackgroundColor = [0.9294 0.6941 0.1255];
+            app.Panel_3.Position = [206 28 404 373];
+
+            % Create UIAxes
+            app.UIAxes = uiaxes(app.Panel_3);
+            zlabel(app.UIAxes, 'Z')
+            app.UIAxes.Position = [11 14 384 325];
+
+            % Create ImportedMRIImageLabel
+            app.ImportedMRIImageLabel = uilabel(app.Panel_3);
+            app.ImportedMRIImageLabel.FontName = 'Roboto';
+            app.ImportedMRIImageLabel.FontSize = 16;
+            app.ImportedMRIImageLabel.FontWeight = 'bold';
+            app.ImportedMRIImageLabel.Position = [124 344 157 22];
+            app.ImportedMRIImageLabel.Text = 'Imported MRI Image';
+
+            % Create ImageFilteringforBrainTumorDetectionusingMRIImageLabel
+            app.ImageFilteringforBrainTumorDetectionusingMRIImageLabel = uilabel(app.InputImageTab);
+            app.ImageFilteringforBrainTumorDetectionusingMRIImageLabel.FontName = 'Roboto';
+            app.ImageFilteringforBrainTumorDetectionusingMRIImageLabel.FontSize = 18;
+            app.ImageFilteringforBrainTumorDetectionusingMRIImageLabel.FontWeight = 'bold';
+            app.ImageFilteringforBrainTumorDetectionusingMRIImageLabel.FontColor = [1 1 1];
+            app.ImageFilteringforBrainTumorDetectionusingMRIImageLabel.Position = [66 417 512 23];
+            app.ImageFilteringforBrainTumorDetectionusingMRIImageLabel.Text = 'Image Filtering for Brain Tumor Detection using MRI Image ';
+
+            % Create Panel_8
+            app.Panel_8 = uipanel(app.InputImageTab);
+            app.Panel_8.BackgroundColor = [0.9294 0.6941 0.1255];
+            app.Panel_8.Position = [22 29 160 258];
+
+            % Create RunButton
+            app.RunButton = uibutton(app.Panel_8, 'push');
+            app.RunButton.ButtonPushedFcn = createCallbackFcn(app, @RunButtonPushed, true);
+            app.RunButton.Position = [8 19 141 31];
+            app.RunButton.Text = 'Run';
+
+            % Create Label_3
+            app.Label_3 = uilabel(app.Panel_8);
+            app.Label_3.HorizontalAlignment = 'center';
+            app.Label_3.FontName = 'Roboto';
+            app.Label_3.FontColor = [0.149 0.149 0.149];
+            app.Label_3.Position = [20 156 120 88];
+            app.Label_3.Text = {'Group 7:'; ''; 'Rendy Christian'; '(2006529695)'; 'Valerie Olive Suryono'; '(2006574364) '};
+
+            % Create InputYourMRIImagebmpformatbypressingtheRunbuttonbelowLabel
+            app.InputYourMRIImagebmpformatbypressingtheRunbuttonbelowLabel = uilabel(app.Panel_8);
+            app.InputYourMRIImagebmpformatbypressingtheRunbuttonbelowLabel.HorizontalAlignment = 'center';
+            app.InputYourMRIImagebmpformatbypressingtheRunbuttonbelowLabel.FontName = 'Roboto';
+            app.InputYourMRIImagebmpformatbypressingtheRunbuttonbelowLabel.FontWeight = 'bold';
+            app.InputYourMRIImagebmpformatbypressingtheRunbuttonbelowLabel.FontAngle = 'italic';
+            app.InputYourMRIImagebmpformatbypressingtheRunbuttonbelowLabel.FontColor = [0.149 0.149 0.149];
+            app.InputYourMRIImagebmpformatbypressingtheRunbuttonbelowLabel.Position = [17 60 127 59];
+            app.InputYourMRIImagebmpformatbypressingtheRunbuttonbelowLabel.Text = {'Input Your MRI Image'; '(.bmp format)'; 'by pressing the "Run"'; ' button below!'};
+
+            % Create TumorDetectionTab
+            app.TumorDetectionTab = uitab(app.TabGroup);
+            app.TumorDetectionTab.Title = 'Tumor Detection';
+            app.TumorDetectionTab.BackgroundColor = [0.6353 0.0784 0.1843];
+
+            % Create TabGroup2
+            app.TabGroup2 = uitabgroup(app.TumorDetectionTab);
+            app.TabGroup2.Position = [26 28 591 402];
+
+            % Create MRlOriginalImageTab
+            app.MRlOriginalImageTab = uitab(app.TabGroup2);
+            app.MRlOriginalImageTab.Title = 'MRl Original Image';
+            app.MRlOriginalImageTab.BackgroundColor = [0.9294 0.6941 0.1255];
+
+            % Create MRIOriginalImageLabel
+            app.MRIOriginalImageLabel = uilabel(app.MRlOriginalImageTab);
+            app.MRIOriginalImageLabel.FontName = 'Roboto';
+            app.MRIOriginalImageLabel.FontSize = 16;
+            app.MRIOriginalImageLabel.FontWeight = 'bold';
+            app.MRIOriginalImageLabel.Position = [45 338 148 22];
+            app.MRIOriginalImageLabel.Text = 'MRI Original Image';
+
+            % Create Panel_4
+            app.Panel_4 = uipanel(app.MRlOriginalImageTab);
+            app.Panel_4.BackgroundColor = [0 0 0];
+            app.Panel_4.Position = [45 26 507 299];
+
+            % Create UIAxes2
+            app.UIAxes2 = uiaxes(app.Panel_4);
+            title(app.UIAxes2, 'Title')
+            xlabel(app.UIAxes2, 'X')
+            ylabel(app.UIAxes2, 'Y')
+            zlabel(app.UIAxes2, 'Z')
+            app.UIAxes2.Position = [16 12 481 276];
+
+            % Create ImageFilteringTab
+            app.ImageFilteringTab = uitab(app.TabGroup2);
+            app.ImageFilteringTab.Title = 'Image Filtering';
+            app.ImageFilteringTab.BackgroundColor = [0.9294 0.6941 0.1255];
+
+            % Create FilteredMRIImageLabel
+            app.FilteredMRIImageLabel = uilabel(app.ImageFilteringTab);
+            app.FilteredMRIImageLabel.FontName = 'Roboto';
+            app.FilteredMRIImageLabel.FontSize = 16;
+            app.FilteredMRIImageLabel.FontWeight = 'bold';
+            app.FilteredMRIImageLabel.Position = [45 338 146 22];
+            app.FilteredMRIImageLabel.Text = 'Filtered MRI Image';
+
+            % Create TabGroup3
+            app.TabGroup3 = uitabgroup(app.ImageFilteringTab);
+            app.TabGroup3.Position = [45 38 506 285];
+
+            % Create BWImageTab
+            app.BWImageTab = uitab(app.TabGroup3);
+            app.BWImageTab.Title = 'BW Image';
+            app.BWImageTab.BackgroundColor = [0 0 0];
+
+            % Create UIAxes3
+            app.UIAxes3 = uiaxes(app.BWImageTab);
+            zlabel(app.UIAxes3, 'Z')
+            app.UIAxes3.Position = [1 1 504 259];
+
+            % Create MedianFilterTab
+            app.MedianFilterTab = uitab(app.TabGroup3);
+            app.MedianFilterTab.Title = 'Median Filter';
+            app.MedianFilterTab.BackgroundColor = [0 0 0];
+
+            % Create UIAxes4
+            app.UIAxes4 = uiaxes(app.MedianFilterTab);
+            zlabel(app.UIAxes4, 'Z')
+            app.UIAxes4.Position = [1 1 504 260];
+
+            % Create WienerFilterTab
+            app.WienerFilterTab = uitab(app.TabGroup3);
+            app.WienerFilterTab.Title = 'Wiener Filter';
+            app.WienerFilterTab.BackgroundColor = [0 0 0];
+
+            % Create UIAxes5
+            app.UIAxes5 = uiaxes(app.WienerFilterTab);
+            zlabel(app.UIAxes5, 'Z')
+            app.UIAxes5.Position = [0 1 505 260];
+
+            % Create BinarizeTab
+            app.BinarizeTab = uitab(app.TabGroup3);
+            app.BinarizeTab.Title = 'Binarize';
+            app.BinarizeTab.BackgroundColor = [0 0 0];
+
+            % Create UIAxes6
+            app.UIAxes6 = uiaxes(app.BinarizeTab);
+            zlabel(app.UIAxes6, 'Z')
+            app.UIAxes6.Position = [1 1 504 260];
+
+            % Create PredefinedSobelFilterTab
+            app.PredefinedSobelFilterTab = uitab(app.TabGroup3);
+            app.PredefinedSobelFilterTab.Title = 'Predefined Sobel Filter';
+            app.PredefinedSobelFilterTab.BackgroundColor = [0 0 0];
+
+            % Create UIAxes7
+            app.UIAxes7 = uiaxes(app.PredefinedSobelFilterTab);
+            zlabel(app.UIAxes7, 'Z')
+            app.UIAxes7.Position = [1 1 504 260];
+
+            % Create TumorDetectionTab_2
+            app.TumorDetectionTab_2 = uitab(app.TabGroup2);
+            app.TumorDetectionTab_2.Title = 'Tumor Detection';
+            app.TumorDetectionTab_2.BackgroundColor = [0.9294 0.6941 0.1255];
+
+            % Create TumorClassificationLabel
+            app.TumorClassificationLabel = uilabel(app.TumorDetectionTab_2);
+            app.TumorClassificationLabel.FontName = 'Roboto';
+            app.TumorClassificationLabel.FontSize = 16;
+            app.TumorClassificationLabel.FontWeight = 'bold';
+            app.TumorClassificationLabel.Position = [43 338 159 22];
+            app.TumorClassificationLabel.Text = 'Tumor Classification';
+
+            % Create Panel_6
+            app.Panel_6 = uipanel(app.TumorDetectionTab_2);
+            app.Panel_6.BackgroundColor = [0 0 0];
+            app.Panel_6.Position = [44 26 507 299];
+
+            % Create UIAxes8
+            app.UIAxes8 = uiaxes(app.Panel_6);
+            zlabel(app.UIAxes8, 'Z')
+            app.UIAxes8.Position = [2 0 504 299];
+
+            % Show the figure after all components are created
+            app.UIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = GUI_Kelompok_7_m
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end
