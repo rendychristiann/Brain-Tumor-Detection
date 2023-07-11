@@ -1,4 +1,4 @@
-# Brain-Tumor-Detection
+# Image-Processing-for-Brain-Tumor-Detection
 Brain Tumor Detection from MRI Image using MATLAB. This program is using Edge Detection algorithm and Image Filtering method to detecting area of tumor. 
 
 ![image](https://github.com/rendychristiann/Brain-Tumor-Detection/assets/78911479/0d56a26e-b937-4e68-bc49-df308ef283dd)
